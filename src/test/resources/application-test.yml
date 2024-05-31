@@ -4,6 +4,8 @@ spring:
     username: sa
     password: password
     driverClassName: org.h2.Driver
+  flyway:
+    enabled: false
   h2:
     console:
       enabled: true
