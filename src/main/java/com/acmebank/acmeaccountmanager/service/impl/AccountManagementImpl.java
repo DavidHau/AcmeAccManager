@@ -18,7 +18,7 @@ class AccountManagementImpl implements AccountManagement {
 
     @Override
     public MoneyAccount getAccount(GetMoneyAccountRequest request) {
-        final UUID moneyAccountId = request.id();
+        final String moneyAccountId = request.id();
         final UUID userId = request.userId();
 
         MoneyAccount dummyAccount = MoneyAccount.builder()

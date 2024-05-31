@@ -7,7 +7,7 @@ import java.util.UUID;
 
 @Builder
 public record MoneyAccount(
-    UUID id,
+    String id,
     Integer version,
     UUID primaryOwnerId,
     String currencyCode,

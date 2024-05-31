@@ -12,7 +12,7 @@ public interface AccountManagement {
 
     @Builder
     record GetMoneyAccountRequest(
-        @NotNull UUID id,
+        @NotNull String id,
         // TODO: authorization checking should be in place
         @NotNull UUID userId
     ) {

@@ -24,7 +24,7 @@ class AccountManagementUseCaseIntegrationTest {
     void shouldReturnDummyAccount() {
         // given
         final UUID userId = UUID.randomUUID();
-        final UUID moneyAccountId = UUID.randomUUID();
+        final String moneyAccountId = UUID.randomUUID().toString();
 
         // when
         MoneyAccount actualAccount = accountManagement.getAccount(AccountManagement.GetMoneyAccountRequest.builder()
@@ -46,7 +46,7 @@ class AccountManagementUseCaseIntegrationTest {
 
     @Test
     void userIdMustBeProvidedWhenGetAccount() {
-        final UUID moneyAccountId = UUID.randomUUID();
+        final String moneyAccountId = UUID.randomUUID().toString();
         assertThrows(ConstraintViolationException.class,
             () -> accountManagement.getAccount(AccountManagement.GetMoneyAccountRequest.builder()
                 .id(moneyAccountId)
