@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @RequestMapping("/accounts")
@@ -43,6 +44,18 @@ public class MoneyAccountController {
             .id(accountId)
             .build());
         return mapper.serviceToRest(account);
+    }
+
+    @GetMapping
+    @Operation(summary = "Get All Money Accounts.")
+    public List<MoneyAccountVo> getAllMoneyAccounts(
+        @RequestHeader
+        @Parameter(schema = @Schema(example = "2a31b993-4895-4484-9521-066f741c89b9"))
+        UUID userId
+    ) {
+        List<MoneyAccount> accounts = accountManagement.getAllAccounts(userId);
+        return accounts.stream().map(mapper::serviceToRest)
+            .toList();
     }
 
 
