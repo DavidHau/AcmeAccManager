@@ -12,7 +12,7 @@ import org.mapstruct.Named;
 public abstract class AccountManagementImplMapper {
 
     @Mapping(target = "balance", source = ".", qualifiedByName = "toMoney")
-    public abstract MoneyAccount entityToDto(MoneyAccountEntity moneyAccountEntity);
+    public abstract MoneyAccount entityToDomainObject(MoneyAccountEntity moneyAccountEntity);
 
     @Named("toMoney")
     public Money toMoney(MoneyAccountEntity entity) {

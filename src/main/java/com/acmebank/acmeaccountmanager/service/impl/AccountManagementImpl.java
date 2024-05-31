@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -32,6 +33,13 @@ class AccountManagementImpl implements AccountManagement {
 
         MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
             .get(); // TODO: not found exception handling
-        return mapper.entityToDto(moneyAccountEntity);
+        return mapper.entityToDomainObject(moneyAccountEntity);
+    }
+
+    @Override
+    public List<MoneyAccount> getAllAccounts(UUID userId) {
+        return moneyAccountRepository.findAllByPrimaryOwnerIdOrderById(userId)
+            .stream().map(mapper::entityToDomainObject)
+            .toList();
     }
 }
