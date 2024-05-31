@@ -32,6 +32,6 @@ class AccountManagementImpl implements AccountManagement {
 
         MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
             .get(); // TODO: not found exception handling
-        return mapper.entityToDto(moneyAccountEntity);
+        return mapper.entityToDomainObject(moneyAccountEntity);
     }
 }
