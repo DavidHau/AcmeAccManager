@@ -18,6 +18,7 @@ class AccountManagementImpl implements AccountManagement {
 
     private final MoneyAccountRepository moneyAccountRepository;
     private final AccountManagementImplMapper mapper;
+    private final AuthorizationValidationService authorizationValidationService;
 
     public AccountManagementImpl(
         MoneyAccountRepository moneyAccountRepository,
@@ -25,6 +26,7 @@ class AccountManagementImpl implements AccountManagement {
     ) {
         this.moneyAccountRepository = moneyAccountRepository;
         this.mapper = mapper;
+        this.authorizationValidationService = new AuthorizationValidationService();
     }
 
     @Override
@@ -35,7 +37,9 @@ class AccountManagementImpl implements AccountManagement {
         MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
             .orElseThrow(
                 () -> new EntityNotFoundException("MoneyAccount[%s] does not exist!".formatted(moneyAccountId)));
-        return mapper.entityToDomainObject(moneyAccountEntity);
+        MoneyAccount moneyAccount = mapper.entityToDomainObject(moneyAccountEntity);
+        authorizationValidationService.ensureHasReadAccess(moneyAccount, userId);
+        return moneyAccount;
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.acmebank.acmeaccountmanager.rest.exception;
 
+import com.acmebank.acmeaccountmanager.service.exception.NotAuthorizedErrorException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,16 @@ public class GlobalExceptionHandler {
         log.info(exception.getMessage(), exception);
         return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
             HttpStatus.NOT_FOUND);
+    }
+
+
+    // ---- Auth Error ----
+
+    @ExceptionHandler(NotAuthorizedErrorException.class)
+    public ResponseEntity<ErrorResponse> generateNotAuthorizedErrorExceptionResponse(
+        NotAuthorizedErrorException exception) {
+        log.warn("NotAuthorizedErrorException: " + exception.getMessage());
+        return new ResponseEntity<>(new ErrorResponse("You are not authorized!"), HttpStatus.FORBIDDEN);
     }
 
 

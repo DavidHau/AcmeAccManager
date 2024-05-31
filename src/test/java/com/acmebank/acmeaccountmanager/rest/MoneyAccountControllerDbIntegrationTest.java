@@ -122,4 +122,24 @@ class MoneyAccountControllerDbIntegrationTest {
             );
     }
 
+    @Test
+    void shouldReturn403ForbiddenWhenGetAccountByNonOwner() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final UUID nonAuthorizedUserId = UUID.randomUUID();
+        final String accountId = "12345678";
+        setupAccount(accountOwnerUserId, accountId, Money.of(BigDecimal.valueOf(1000000.01), "HKD"));
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.get("/accounts/{account-id}", accountId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, nonAuthorizedUserId)
+            )
+
+            // then
+            .andExpectAll(status().isForbidden(),
+                jsonPath("$.error").value("You are not authorized!")
+            );
+    }
+
 }
