@@ -3,6 +3,7 @@ package com.acmebank.acmeaccountmanager.service.impl;
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
 import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -17,6 +18,7 @@ class AccountManagementImpl implements AccountManagement {
 
     private final MoneyAccountRepository moneyAccountRepository;
     private final AccountManagementImplMapper mapper;
+    private final AuthorizationValidationService authorizationValidationService;
 
     public AccountManagementImpl(
         MoneyAccountRepository moneyAccountRepository,
@@ -24,6 +26,7 @@ class AccountManagementImpl implements AccountManagement {
     ) {
         this.moneyAccountRepository = moneyAccountRepository;
         this.mapper = mapper;
+        this.authorizationValidationService = new AuthorizationValidationService();
     }
 
     @Override
@@ -32,8 +35,11 @@ class AccountManagementImpl implements AccountManagement {
         final UUID userId = request.userId();   // TODO: authorization checking
 
         MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
-            .get(); // TODO: not found exception handling
-        return mapper.entityToDomainObject(moneyAccountEntity);
+            .orElseThrow(
+                () -> new EntityNotFoundException("MoneyAccount[%s] does not exist!".formatted(moneyAccountId)));
+        MoneyAccount moneyAccount = mapper.entityToDomainObject(moneyAccountEntity);
+        authorizationValidationService.ensureHasReadAccess(moneyAccount, userId);
+        return moneyAccount;
     }
 
     @Override
