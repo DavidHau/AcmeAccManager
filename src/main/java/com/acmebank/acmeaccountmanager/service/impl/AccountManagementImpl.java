@@ -3,6 +3,7 @@ package com.acmebank.acmeaccountmanager.service.impl;
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
 import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -32,7 +33,8 @@ class AccountManagementImpl implements AccountManagement {
         final UUID userId = request.userId();   // TODO: authorization checking
 
         MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
-            .get(); // TODO: not found exception handling
+            .orElseThrow(
+                () -> new EntityNotFoundException("MoneyAccount[%s] does not exist!".formatted(moneyAccountId)));
         return mapper.entityToDomainObject(moneyAccountEntity);
     }
 

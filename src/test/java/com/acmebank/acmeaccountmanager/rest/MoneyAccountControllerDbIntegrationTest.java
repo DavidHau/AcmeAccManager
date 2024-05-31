@@ -1,6 +1,7 @@
 package com.acmebank.acmeaccountmanager.rest;
 
 import com.acmebank.acmeaccountmanager.service.impl.MoneyAccountEntity;
+import org.hamcrest.Matchers;
 import org.javamoney.moneta.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,4 +103,23 @@ class MoneyAccountControllerDbIntegrationTest {
                 jsonPath("$[1].balanceAmount").value(1000000)
             );
     }
+
+    @Test
+    void shouldReturn404NotFoundWhenGetAccountGivenAccountNotExist() throws Exception {
+        // given
+        final UUID userId = UUID.randomUUID();
+        final String nonExistingMoneyAccountId = UUID.randomUUID().toString();
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.get("/accounts/{account-id}", nonExistingMoneyAccountId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, userId)
+            )
+
+            // then
+            .andExpectAll(status().isNotFound(),
+                jsonPath("$.error").value(Matchers.matchesRegex("MoneyAccount.* does not exist!"))
+            );
+    }
+
 }
