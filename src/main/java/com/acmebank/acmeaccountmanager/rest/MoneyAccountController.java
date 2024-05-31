@@ -1,5 +1,8 @@
 package com.acmebank.acmeaccountmanager.rest;
 
+import com.acmebank.acmeaccountmanager.rest.mapper.AccountManagementMapper;
+import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
+import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,9 +13,22 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-@RequestMapping("/account")
+@RequestMapping("/accounts")
 @RestController
 public class MoneyAccountController {
+
+    private final AccountManagement accountManagement;
+    private final AccountManagementMapper mapper;
+
+
+    public MoneyAccountController(
+        AccountManagement accountManagement,
+        AccountManagementMapper mapper
+    ) {
+        this.accountManagement = accountManagement;
+        this.mapper = mapper;
+    }
+
     @GetMapping("/{account-id}")
     @Operation(summary = "Get Money Account.",
         description = "To simplify stuff, only account owner user is permitted to retrieve the account.")
@@ -22,13 +38,11 @@ public class MoneyAccountController {
         UUID userId,
         @PathVariable("account-id") String accountId
     ) {
-        return new MoneyAccountVo(
-            accountId,
-            1,
-            userId,
-            "HKD",
-            BigDecimal.valueOf(1000000)
-        );
+        MoneyAccount account = accountManagement.getAccount(AccountManagement.GetMoneyAccountRequest.builder()
+            .userId(userId)
+            .id(accountId)
+            .build());
+        return mapper.serviceToRest(account);
     }
 
 
