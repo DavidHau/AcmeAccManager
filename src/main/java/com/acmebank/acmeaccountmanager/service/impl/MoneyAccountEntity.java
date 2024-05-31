@@ -29,12 +29,12 @@ public class MoneyAccountEntity {
     String currencyCode;
 
     @Column(precision = 22, scale = 2, nullable = false)
-    private BigDecimal balance;
+    private BigDecimal balanceAmount;
 
     @PrePersist
     @PreUpdate
     private void validateBalance() {
-        if (balance.compareTo(BigDecimal.ZERO) < 0) {
+        if (balanceAmount.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Account balance cannot be negative");
         }
     }

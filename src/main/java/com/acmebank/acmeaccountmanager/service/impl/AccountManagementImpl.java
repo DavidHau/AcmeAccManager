@@ -2,12 +2,11 @@ package com.acmebank.acmeaccountmanager.service.impl;
 
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
-import org.javamoney.moneta.Money;
+import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -15,19 +14,24 @@ import java.util.UUID;
 @Transactional
 class AccountManagementImpl implements AccountManagement {
 
+    private final MoneyAccountRepository moneyAccountRepository;
+    private final AccountManagementImplMapper mapper;
+
+    public AccountManagementImpl(
+        MoneyAccountRepository moneyAccountRepository,
+        AccountManagementImplMapper mapper
+    ) {
+        this.moneyAccountRepository = moneyAccountRepository;
+        this.mapper = mapper;
+    }
 
     @Override
     public MoneyAccount getAccount(GetMoneyAccountRequest request) {
         final String moneyAccountId = request.id();
-        final UUID userId = request.userId();
+        final UUID userId = request.userId();   // TODO: authorization checking
 
-        MoneyAccount dummyAccount = MoneyAccount.builder()
-            .id(moneyAccountId)
-            .version(1)
-            .primaryOwnerId(userId)
-            .currencyCode("HKD")
-            .balance(Money.of(BigDecimal.valueOf(0500.100), "HKD"))
-            .build();
-        return dummyAccount;
+        MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
+            .get(); // TODO: not found exception handling
+        return mapper.entityToDto(moneyAccountEntity);
     }
 }

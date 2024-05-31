@@ -20,11 +20,23 @@ class AccountManagementUseCaseIntegrationTest {
     @Autowired
     AccountManagement accountManagement;
 
+    @Autowired
+    MoneyAccountRepository moneyAccountRepository;
+
     @Test
-    void shouldReturnDummyAccount() {
+    void shouldSaveAndGetAccountWithBalanceIn2DecimalPlaces() {
         // given
+        final double amountWith4dp = 0500.1234;
         final UUID userId = UUID.randomUUID();
         final String moneyAccountId = UUID.randomUUID().toString();
+        MoneyAccountEntity dummyAccount = MoneyAccountEntity.builder()
+            .id(moneyAccountId)
+            .version(1)
+            .primaryOwnerId(userId)
+            .currencyCode("HKD")
+            .balanceAmount(BigDecimal.valueOf(amountWith4dp))
+            .build();
+        moneyAccountRepository.save(dummyAccount);
 
         // when
         MoneyAccount actualAccount = accountManagement.getAccount(AccountManagement.GetMoneyAccountRequest.builder()
@@ -40,7 +52,7 @@ class AccountManagementUseCaseIntegrationTest {
             () -> assertThat(actualAccount.version()).isEqualTo(1),
             () -> assertThat(actualAccount.currencyCode()).isEqualTo("HKD"),
             () -> assertThat(actualAccount.balance().getCurrency().getCurrencyCode()).isEqualTo("HKD"),
-            () -> assertThat(actualAccount.balance().getNumberStripped()).isEqualTo(BigDecimal.valueOf(500.1))
+            () -> assertThat(actualAccount.balance().getNumberStripped()).isEqualTo(BigDecimal.valueOf(500.12))
         );
     }
 

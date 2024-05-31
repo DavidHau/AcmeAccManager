@@ -22,7 +22,7 @@ class MoneyAccountEntityIntegrationTest {
             .version(1)
             .primaryOwnerId(UUID.randomUUID())
             .currencyCode("HKD")
-            .balance(BigDecimal.valueOf(-123))
+            .balanceAmount(BigDecimal.valueOf(-123))
             .build();
 
         Exception actualException = assertThrows(Exception.class,
