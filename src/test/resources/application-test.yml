@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:acme-acc-manager-db-test
+    url: jdbc:h2:~/acme-acc-manager-db-test;AUTO_SERVER=TRUE;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     username: sa
     password: password
     driverClassName: org.h2.Driver
