@@ -17,6 +17,8 @@ public interface AccountManagement {
 
     void transferMoneyToAccount(@Valid TransferMoneyToAccountRequest request);
 
+    List<TransactionLog> getAllTransactionLog(@NotNull UUID userId);
+
     @Builder
     record GetMoneyAccountRequest(
         @NotNull String id,

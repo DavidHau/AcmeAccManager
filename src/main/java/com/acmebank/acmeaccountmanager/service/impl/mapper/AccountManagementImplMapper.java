@@ -1,7 +1,9 @@
 package com.acmebank.acmeaccountmanager.service.impl.mapper;
 
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
+import com.acmebank.acmeaccountmanager.service.api.TransactionLog;
 import com.acmebank.acmeaccountmanager.service.impl.MoneyAccountEntity;
+import com.acmebank.acmeaccountmanager.service.impl.TransactionLogEntity;
 import org.javamoney.moneta.Money;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -18,4 +20,6 @@ public abstract class AccountManagementImplMapper {
     public Money toMoney(MoneyAccountEntity entity) {
         return Money.of(entity.getBalanceAmount(), entity.getCurrencyCode());
     }
+
+    public abstract TransactionLog entityToDomainObject(TransactionLogEntity transactionLogEntity);
 }

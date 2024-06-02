@@ -269,4 +269,111 @@ class MoneyAccountControllerDbIntegrationTest {
             .andExpectAll(status().isUnprocessableEntity(),
                 jsonPath("$.error").value("Account[%s] does not have enough balance!".formatted(accountId1)));
     }
+
+    @Test
+    void shouldReturn409ConflictWhenTransferMoneyToAnotherAccountGivenStaledOperatingAccountData() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        // 1st update
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+            .contentType(MediaType.APPLICATION_JSON)
+            .header(HEADER_USER_ID, accountOwnerUserId)
+            .content("""
+                    {
+                        "operatingAccountVersion": 1,
+                        "recipientAccountId": "%s",
+                        "currencyCode": "HKD",
+                        "amount": 10000
+                    }
+                """.formatted(accountId2))
+        ).andExpectAll(status().isNoContent());
+
+        // when using staled data(version) to update
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, accountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "HKD",
+                            "amount": 10000
+                        }
+                    """.formatted(accountId2))
+            )
+
+            // then
+            .andExpectAll(status().isConflict(),
+                jsonPath("$.error").value("Concurrent operation conflict is detected."));
+    }
+
+    @Test
+    void shouldReturn403ForbiddenWhenTransferMoneyToAnotherAccountByNonAccountOwner() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final UUID anotherAccountOwnerUserId = UUID.randomUUID();
+        final String accountId = "12345678" + UUID.randomUUID();
+        final String anotherAccountId = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(anotherAccountOwnerUserId, anotherAccountId, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, anotherAccountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "HKD",
+                            "amount": 10000
+                        }
+                    """.formatted(anotherAccountId))
+            )
+
+            // then
+            .andExpectAll(status().isForbidden(),
+                jsonPath("$.error").value("You are not authorized!"));
+    }
+
+    @Test
+    void shouldBeAbleToGetTransactionLogsByUserId() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+            .contentType(MediaType.APPLICATION_JSON)
+            .header(HEADER_USER_ID, accountOwnerUserId)
+            .content("""
+                    {
+                        "operatingAccountVersion": 1,
+                        "recipientAccountId": "%s",
+                        "currencyCode": "HKD",
+                        "amount": 10000
+                    }
+                """.formatted(accountId2))
+        ).andExpectAll(status().isNoContent());
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.get("/accounts/transaction-log")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, accountOwnerUserId)
+            )
+
+            // then
+            .andExpectAll(status().isOk(),
+                jsonPath("$").isArray(),
+                jsonPath("$", hasSize(2)),
+                jsonPath("$[?(@.operation == 'ADD')]").exists(),
+                jsonPath("$[?(@.operation == 'DEDUCT')]").exists()
+            );
+
+    }
 }

@@ -3,11 +3,13 @@ package com.acmebank.acmeaccountmanager.service.impl;
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
 import jakarta.validation.ConstraintViolationException;
+import org.javamoney.moneta.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,6 +24,20 @@ class AccountManagementUseCaseIntegrationTest {
 
     @Autowired
     MoneyAccountRepository moneyAccountRepository;
+
+    @Autowired
+    TransactionLogRepository transactionLogRepository;
+
+    void setupAccount(UUID userId, String accountId, Money balance) {
+        MoneyAccountEntity accountEntity = MoneyAccountEntity.builder()
+            .id(accountId)
+            .version(1)
+            .primaryOwnerId(userId)
+            .currencyCode(balance.getCurrency().getCurrencyCode())
+            .balanceAmount(balance.getNumberStripped())
+            .build();
+        moneyAccountRepository.save(accountEntity);
+    }
 
     @Test
     void shouldSaveAndGetAccountWithBalanceIn2DecimalPlaces() {
@@ -65,4 +81,121 @@ class AccountManagementUseCaseIntegrationTest {
                 .build()));
     }
 
+    @Test
+    void shouldStoreDeductTransactionLogWhenTransferMoneyToAnotherAccount() {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        accountManagement.transferMoneyToAccount(AccountManagement.TransferMoneyToAccountRequest.builder()
+            .userId(accountOwnerUserId)
+            .operatingAccountId(accountId1)
+            .operatingAccountVersion(1)
+            .recipientAccountId(accountId2)
+            .currencyCode("HKD")
+            .toBeTransferAmount(BigDecimal.valueOf(50.05))
+            .build());
+
+        // then
+        List<TransactionLogEntity> actualTransactionLogs =
+            transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
+        TransactionLogEntity deductLog =
+            actualTransactionLogs.stream().filter(log -> log.getOperation().equals("DEDUCT")).findFirst().orElseThrow();
+        assertAll(
+            () -> assertThat(actualTransactionLogs).hasSizeGreaterThanOrEqualTo(1),
+            () -> assertThat(deductLog.getOperatorUserId()).isEqualTo(accountOwnerUserId),
+            () -> assertThat(deductLog.getOperatingAccountId()).isEqualTo(accountId1),
+            () -> assertThat(deductLog.getOperation()).isEqualTo("DEDUCT"),
+            () -> assertThat(deductLog.getCounterpartAccountId()).isEqualTo(accountId2),
+            () -> assertThat(deductLog.getReferenceCode()).startsWith("TRANSFER_"),
+            () -> assertThat(deductLog.getReferenceCode()).hasSizeGreaterThan(20),
+            () -> assertThat(deductLog.getCurrencyCode()).isEqualTo("HKD"),
+            () -> assertThat(deductLog.getMoneyAmount()).isEqualTo(BigDecimal.valueOf(50.05)),
+            () -> assertThat(deductLog.getCreateDateTimeUtc()).isNotNull()
+        );
+    }
+
+    @Test
+    void shouldStoreAddTransactionLogWhenReceiveMoneyFromTransfer() {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        accountManagement.transferMoneyToAccount(AccountManagement.TransferMoneyToAccountRequest.builder()
+            .userId(accountOwnerUserId)
+            .operatingAccountId(accountId1)
+            .operatingAccountVersion(1)
+            .recipientAccountId(accountId2)
+            .currencyCode("HKD")
+            .toBeTransferAmount(BigDecimal.valueOf(50.05))
+            .build());
+
+        // then
+        List<TransactionLogEntity> actualTransactionLogs =
+            transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
+        TransactionLogEntity addLog =
+            actualTransactionLogs.stream().filter(log -> log.getOperation().equals("ADD")).findFirst().orElseThrow();
+        assertAll(
+            () -> assertThat(actualTransactionLogs).hasSizeGreaterThanOrEqualTo(1),
+            () -> assertThat(addLog.getOperatorUserId()).isEqualTo(accountOwnerUserId),
+            () -> assertThat(addLog.getOperatingAccountId()).isEqualTo(accountId2),
+            () -> assertThat(addLog.getOperation()).isEqualTo("ADD"),
+            () -> assertThat(addLog.getCounterpartAccountId()).isEqualTo(accountId1),
+            () -> assertThat(addLog.getReferenceCode()).startsWith("TRANSFER_"),
+            () -> assertThat(addLog.getCurrencyCode()).isEqualTo("HKD"),
+            () -> assertThat(addLog.getMoneyAmount()).isEqualTo(BigDecimal.valueOf(50.05)),
+            () -> assertThat(addLog.getCreateDateTimeUtc()).isNotNull()
+        );
+    }
+
+    @Test
+    void shouldStoreAddNDeductTransactionLogInPairOrderByCreateDateTimeDescWhenTransferMoneyToAnotherAccount() {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        accountManagement.transferMoneyToAccount(AccountManagement.TransferMoneyToAccountRequest.builder()
+            .userId(accountOwnerUserId)
+            .operatingAccountId(accountId1)
+            .operatingAccountVersion(1)
+            .recipientAccountId(accountId2)
+            .currencyCode("HKD")
+            .toBeTransferAmount(BigDecimal.valueOf(50.05))
+            .build());
+
+        // then
+        List<TransactionLogEntity> actualTransactionLogs =
+            transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
+        assertAll(
+            () -> assertThat(actualTransactionLogs).hasSize(2),
+            () -> assertThat(actualTransactionLogs.get(0).getOperatorUserId())
+                .isEqualTo(actualTransactionLogs.get(1).getOperatorUserId()),
+            () -> assertThat(actualTransactionLogs.get(0).getOperatingAccountId())
+                .isEqualTo(actualTransactionLogs.get(1).getCounterpartAccountId()),
+            () -> assertThat(actualTransactionLogs.get(0).getOperation()).isEqualTo("ADD"),
+            () -> assertThat(actualTransactionLogs.get(1).getOperation()).isEqualTo("DEDUCT"),
+            () -> assertThat(actualTransactionLogs.get(0).getCounterpartAccountId())
+                .isEqualTo(actualTransactionLogs.get(1).getOperatingAccountId()),
+            () -> assertThat(actualTransactionLogs.get(0).getReferenceCode())
+                .startsWith(actualTransactionLogs.get(1).getReferenceCode()),
+            () -> assertThat(actualTransactionLogs.get(0).getCurrencyCode())
+                .isEqualTo(actualTransactionLogs.get(1).getCurrencyCode()),
+            () -> assertThat(actualTransactionLogs.get(0).getMoneyAmount())
+                .isEqualTo(actualTransactionLogs.get(1).getMoneyAmount()),
+            () -> assertThat(actualTransactionLogs.get(0).getCreateDateTimeUtc())
+                .isAfter(actualTransactionLogs.get(1).getCreateDateTimeUtc())
+        );
+    }
 }
