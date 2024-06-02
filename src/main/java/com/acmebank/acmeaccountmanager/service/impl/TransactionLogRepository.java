@@ -9,6 +9,6 @@ import java.util.UUID;
 @Repository
 interface TransactionLogRepository extends JpaRepository<TransactionLogEntity, UUID> {
 
-    List<TransactionLogEntity> findAllByOperatorUserId(UUID userId);
+    List<TransactionLogEntity> findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(UUID userId);
 
 }
