@@ -2,6 +2,7 @@ package com.acmebank.acmeaccountmanager.service.impl;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.javamoney.moneta.Money;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -31,10 +32,16 @@ public class MoneyAccountEntity {
     @Column(precision = 22, scale = 2, nullable = false)
     private BigDecimal balanceAmount;
 
+    @Transient
+    public Money getBalance() {
+        return Money.of(balanceAmount, currencyCode);
+    }
+
     @PrePersist
     @PreUpdate
     private void validateBalance() {
         if (balanceAmount.compareTo(BigDecimal.ZERO) < 0) {
+            // TODO: Insufficient balance exception
             throw new IllegalArgumentException("Account balance cannot be negative");
         }
     }

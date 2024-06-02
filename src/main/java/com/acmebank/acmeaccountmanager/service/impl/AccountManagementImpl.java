@@ -4,6 +4,7 @@ import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
 import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
 import jakarta.persistence.EntityNotFoundException;
+import org.javamoney.moneta.Money;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -32,14 +33,18 @@ class AccountManagementImpl implements AccountManagement {
     @Override
     public MoneyAccount getAccount(GetMoneyAccountRequest request) {
         final String moneyAccountId = request.id();
-        final UUID userId = request.userId();   // TODO: authorization checking
+        final UUID userId = request.userId();
 
-        MoneyAccountEntity moneyAccountEntity = moneyAccountRepository.findById(moneyAccountId)
-            .orElseThrow(
-                () -> new EntityNotFoundException("MoneyAccount[%s] does not exist!".formatted(moneyAccountId)));
+        MoneyAccountEntity moneyAccountEntity = getMoneyAccountEntityOrThrow(moneyAccountId);
         MoneyAccount moneyAccount = mapper.entityToDomainObject(moneyAccountEntity);
         authorizationValidationService.ensureHasReadAccess(moneyAccount, userId);
         return moneyAccount;
+    }
+
+    private MoneyAccountEntity getMoneyAccountEntityOrThrow(String moneyAccountId) {
+        return moneyAccountRepository.findById(moneyAccountId)
+            .orElseThrow(
+                () -> new EntityNotFoundException("MoneyAccount[%s] does not exist!".formatted(moneyAccountId)));
     }
 
     @Override
@@ -47,5 +52,23 @@ class AccountManagementImpl implements AccountManagement {
         return moneyAccountRepository.findAllByPrimaryOwnerIdOrderById(userId)
             .stream().map(mapper::entityToDomainObject)
             .toList();
+    }
+
+    @Override
+    public void transferMoneyToAccount(TransferMoneyToAccountRequest request) {
+        final MoneyAccountEntity operatingAccount = getMoneyAccountEntityOrThrow(request.operatingAccountId());
+        final MoneyAccountEntity recipientAccount = getMoneyAccountEntityOrThrow(request.recipientAccountId());
+        Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
+        // TODO: Authorization for operation account
+        // TODO: concurrent edit protection
+        // TODO: sufficient amount validation
+        // TODO: transaction log
+        // TODO: transaction reference number
+        Money operatingAccountNewBalance = operatingAccount.getBalance().subtract(toBeTransferMoney);
+        Money recipientAccountNewBalance = recipientAccount.getBalance().add(toBeTransferMoney);
+        operatingAccount.setBalanceAmount(operatingAccountNewBalance.getNumberStripped());
+        recipientAccount.setBalanceAmount(recipientAccountNewBalance.getNumberStripped());
+        moneyAccountRepository.save(operatingAccount);
+        moneyAccountRepository.save(recipientAccount);
     }
 }
