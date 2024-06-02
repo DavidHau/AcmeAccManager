@@ -76,7 +76,7 @@ class AccountManagementImpl implements AccountManagement {
         final String transactionCode = "%s_%s".formatted(operationType, referenceCodeGenerator.generate(20));
         deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney, operatingUserId,
             transactionCode, recipientAccount.getId());
-        addMoney(recipientAccount, toBeTransferMoney, operatingUserId,
+        addMoney(recipientAccount, toBeTransferMoney,
             transactionCode, operatingAccount.getId());
     }
 
@@ -96,7 +96,7 @@ class AccountManagementImpl implements AccountManagement {
         transactionLogRepository.save(TransactionLogEntity.builder()
             .operatingAccountId(account.getId())
             .operation("DEDUCT")
-            .operatorUserId(userId)
+            .operatingAccountUserId(account.getPrimaryOwnerId())
             .referenceCode(transactionCode)
             .counterpartAccountId(counterpartAccountId)
             .currencyCode(amount.getCurrency().getCurrencyCode())
@@ -105,7 +105,7 @@ class AccountManagementImpl implements AccountManagement {
             .build());
     }
 
-    private void addMoney(MoneyAccountEntity account, Money amount, UUID userId,
+    private void addMoney(MoneyAccountEntity account, Money amount,
                           String transactionCode, String counterpartAccountId) {
         Money newBalance = account.getBalance().add(amount);
         account.setBalanceAmount(newBalance.getNumberStripped());
@@ -113,7 +113,7 @@ class AccountManagementImpl implements AccountManagement {
         transactionLogRepository.save(TransactionLogEntity.builder()
             .operatingAccountId(account.getId())
             .operation("ADD")
-            .operatorUserId(userId)
+            .operatingAccountUserId(account.getPrimaryOwnerId())
             .referenceCode(transactionCode)
             .counterpartAccountId(counterpartAccountId)
             .currencyCode(amount.getCurrency().getCurrencyCode())
@@ -124,7 +124,7 @@ class AccountManagementImpl implements AccountManagement {
 
     @Override
     public List<TransactionLog> getAllTransactionLog(UUID userId) {
-        return transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(userId)
+        return transactionLogRepository.findAllByOperatingAccountUserIdOrderByCreateDateTimeUtcDesc(userId)
             .stream()
             .map(mapper::entityToDomainObject)
             .toList();

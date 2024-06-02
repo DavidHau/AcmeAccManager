@@ -11,7 +11,7 @@ public record TransactionLog(
     UUID id,
     String operatingAccountId,
     String operation,
-    UUID operatorUserId,
+    UUID operatingAccountUserId,
     String referenceCode,
     String counterpartAccountId,
     String currencyCode,
