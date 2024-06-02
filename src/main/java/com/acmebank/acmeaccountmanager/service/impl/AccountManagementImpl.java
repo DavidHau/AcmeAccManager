@@ -58,18 +58,19 @@ class AccountManagementImpl implements AccountManagement {
 
     @Override
     public void transferMoneyToAccount(TransferMoneyToAccountRequest request) {
+        final UUID operatingUserId = request.userId();
         final MoneyAccountEntity operatingAccount = getMoneyAccountEntityOrThrow(request.operatingAccountId());
         final Integer operatingAccountVersion = request.operatingAccountVersion();
         final MoneyAccountEntity recipientAccount = getMoneyAccountEntityOrThrow(request.recipientAccountId());
         Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
-        // TODO: Authorization for operation account
         // TODO: transaction log
         // TODO: transaction reference number
-        deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney);
+        deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney, operatingUserId);
         addMoney(recipientAccount, toBeTransferMoney);
     }
 
-    private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount) {
+    private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount, UUID userId) {
+        authorizationValidationService.ensureHasMoneyDeductionAccess(account, userId);
         if (!account.getVersion().equals(versionNumber)) {
             throw new OptimisticLockException(
                 "MoneyAccountId: %s, versionNumber: %s".formatted(account.getId(), versionNumber));

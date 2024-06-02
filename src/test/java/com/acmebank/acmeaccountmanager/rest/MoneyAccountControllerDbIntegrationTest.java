@@ -311,4 +311,33 @@ class MoneyAccountControllerDbIntegrationTest {
                 jsonPath("$.error").value("Concurrent operation conflict is detected."));
     }
 
+    @Test
+    void shouldReturn403ForbiddenWhenTransferMoneyToAnotherAccountByNonAccountOwner() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final UUID anotherAccountOwnerUserId = UUID.randomUUID();
+        final String accountId = "12345678" + UUID.randomUUID();
+        final String anotherAccountId = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(anotherAccountOwnerUserId, anotherAccountId, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, anotherAccountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "HKD",
+                            "amount": 10000
+                        }
+                    """.formatted(anotherAccountId))
+            )
+
+            // then
+            .andExpectAll(status().isForbidden(),
+                jsonPath("$.error").value("You are not authorized!"));
+    }
+
 }
