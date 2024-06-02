@@ -2,6 +2,7 @@ package com.acmebank.acmeaccountmanager.service.impl;
 
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
+import com.acmebank.acmeaccountmanager.service.api.TransactionLog;
 import com.acmebank.acmeaccountmanager.service.exception.InsufficientBalanceErrorException;
 import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
 import jakarta.persistence.EntityNotFoundException;
@@ -120,4 +121,13 @@ class AccountManagementImpl implements AccountManagement {
             .createDateTimeUtc(Instant.now(Clock.systemUTC()))
             .build());
     }
+
+    @Override
+    public List<TransactionLog> getAllTransactionLog(UUID userId) {
+        return transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(userId)
+            .stream()
+            .map(mapper::entityToDomainObject)
+            .toList();
+    }
+
 }

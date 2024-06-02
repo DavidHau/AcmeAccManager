@@ -3,6 +3,7 @@ package com.acmebank.acmeaccountmanager.rest;
 import com.acmebank.acmeaccountmanager.rest.mapper.AccountManagementMapper;
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
+import com.acmebank.acmeaccountmanager.service.api.TransactionLog;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.Operation;
@@ -82,6 +83,16 @@ public class MoneyAccountController {
             .userId(userId)
             .build());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/transaction-log")
+    @Operation(summary = "Get All Transaction Log by User.")
+    public List<TransactionLog> getAllTransactionLogByUser(
+        @RequestHeader
+        @Parameter(schema = @Schema(example = "2a31b993-4895-4484-9521-066f741c89b9"))
+        UUID userId
+    ) {
+        return accountManagement.getAllTransactionLog(userId);
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
