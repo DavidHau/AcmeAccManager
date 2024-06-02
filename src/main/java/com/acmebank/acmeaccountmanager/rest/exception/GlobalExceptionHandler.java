@@ -2,6 +2,7 @@ package com.acmebank.acmeaccountmanager.rest.exception;
 
 import com.acmebank.acmeaccountmanager.service.exception.NotAuthorizedErrorException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,14 @@ public class GlobalExceptionHandler {
         log.info(exception.getMessage(), exception);
         return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
             HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> generateConstraintViolationExceptionResponse(
+        ConstraintViolationException exception) {
+        log.info(exception.getMessage(), exception);
+        return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
+            HttpStatus.BAD_REQUEST);
     }
 
 

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -58,6 +59,30 @@ public class MoneyAccountController {
             .toList();
     }
 
+    @PostMapping("/{account-id}/transfer")
+    @Operation(summary = "Transfer Money to Another Account.")
+    public ResponseEntity<Void> transferMoneyToAnotherAccount(
+        @RequestHeader
+        @Parameter(schema = @Schema(example = "2a31b993-4895-4484-9521-066f741c89b9"))
+        UUID userId,
+        @PathVariable("account-id") String operatingAccountId,
+        @RequestBody TransferMoneyToAnotherAccountRequestVo requestVo
+    ) {
+        final Integer operatingAccountVersion = requestVo.operatingAccountVersion();
+        final String recipientAccountId = requestVo.recipientAccountId();
+        final String currencyCode = requestVo.currencyCode();
+        final BigDecimal toBeTransferAmount = requestVo.amount();
+
+        accountManagement.transferMoneyToAccount(AccountManagement.TransferMoneyToAccountRequest.builder()
+            .operatingAccountId(operatingAccountId)
+            .operatingAccountVersion(operatingAccountVersion)
+            .recipientAccountId(recipientAccountId)
+            .currencyCode(currencyCode)
+            .toBeTransferAmount(toBeTransferAmount)
+            .userId(userId)
+            .build());
+        return ResponseEntity.noContent().build();
+    }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record MoneyAccountVo(
@@ -71,6 +96,19 @@ public class MoneyAccountController {
         String currencyCode,
         @JsonProperty(required = true)
         BigDecimal balanceAmount
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record TransferMoneyToAnotherAccountRequestVo(
+        @JsonProperty(required = true)
+        Integer operatingAccountVersion,
+        @JsonProperty(required = true)
+        String recipientAccountId,
+        @JsonProperty(required = true)
+        String currencyCode,
+        @JsonProperty(required = true)
+        BigDecimal amount
     ) {
     }
 }

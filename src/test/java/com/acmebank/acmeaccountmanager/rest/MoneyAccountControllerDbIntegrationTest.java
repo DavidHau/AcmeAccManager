@@ -3,8 +3,11 @@ package com.acmebank.acmeaccountmanager.rest;
 import com.acmebank.acmeaccountmanager.service.impl.MoneyAccountEntity;
 import org.hamcrest.Matchers;
 import org.javamoney.moneta.Money;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @AutoConfigureMockMvc
 class MoneyAccountControllerDbIntegrationTest {
     @Autowired
@@ -31,7 +35,7 @@ class MoneyAccountControllerDbIntegrationTest {
     @Autowired
     private CrudRepository<MoneyAccountEntity, String> moneyAccountRepositoryRaw;
 
-    @BeforeEach
+    @BeforeAll
     void setup() {
         moneyAccountRepositoryRaw.deleteAll();
     }
@@ -52,7 +56,7 @@ class MoneyAccountControllerDbIntegrationTest {
         // given
         final UUID userId = UUID.randomUUID();
         final String accountId = "12345678";
-        setupAccount(userId, accountId, Money.of(BigDecimal.valueOf(1000000.01), "HKD"));
+        setupAccount(userId, accountId, Money.of(BigDecimal.valueOf(1_000_000.01), "HKD"));
 
         // when
         mvc.perform(MockMvcRequestBuilders.get("/accounts/{account-id}", accountId)
@@ -66,7 +70,7 @@ class MoneyAccountControllerDbIntegrationTest {
                 jsonPath("$.version").value(1),
                 jsonPath("$.primaryOwnerId").value(userId.toString()),
                 jsonPath("$.currencyCode").value("HKD"),
-                jsonPath("$.balanceAmount").value(1000000.01)
+                jsonPath("$.balanceAmount").value(1_000_000.01)
             );
     }
 
@@ -74,10 +78,10 @@ class MoneyAccountControllerDbIntegrationTest {
     void shouldAllMoneyAccountsByUserOrderByAccountId() throws Exception {
         // given
         final UUID userId = UUID.randomUUID();
-        final String accountId1 = "88888888";
-        final String accountId2 = "12345678";
-        setupAccount(userId, accountId1, Money.of(BigDecimal.valueOf(1000000), "HKD"));
-        setupAccount(userId, accountId2, Money.of(BigDecimal.valueOf(1000000), "HKD"));
+        final String accountId1 = "88888888" + UUID.randomUUID();
+        final String accountId2 = "12345678" + UUID.randomUUID();
+        setupAccount(userId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(userId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
 
         // when
         mvc.perform(MockMvcRequestBuilders.get("/accounts")
@@ -90,17 +94,17 @@ class MoneyAccountControllerDbIntegrationTest {
                 jsonPath("$").isArray(),
                 jsonPath("$", hasSize(2)),
 
-                jsonPath("$[0].id").value("12345678"),
+                jsonPath("$[0].id").value(Matchers.startsWith("12345678")),
                 jsonPath("$[0].version").value(1),
                 jsonPath("$[0].primaryOwnerId").value(userId.toString()),
                 jsonPath("$[0].currencyCode").value("HKD"),
-                jsonPath("$[0].balanceAmount").value(1000000),
+                jsonPath("$[0].balanceAmount").value(1_000_000),
 
-                jsonPath("$[1].id").value("88888888"),
+                jsonPath("$[1].id").value(Matchers.startsWith("88888888")),
                 jsonPath("$[1].version").value(1),
                 jsonPath("$[1].primaryOwnerId").value(userId.toString()),
                 jsonPath("$[1].currencyCode").value("HKD"),
-                jsonPath("$[1].balanceAmount").value(1000000)
+                jsonPath("$[1].balanceAmount").value(1_000_000)
             );
     }
 
@@ -127,8 +131,8 @@ class MoneyAccountControllerDbIntegrationTest {
         // given
         final UUID accountOwnerUserId = UUID.randomUUID();
         final UUID nonAuthorizedUserId = UUID.randomUUID();
-        final String accountId = "12345678";
-        setupAccount(accountOwnerUserId, accountId, Money.of(BigDecimal.valueOf(1000000.01), "HKD"));
+        final String accountId = "12345678" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId, Money.of(BigDecimal.valueOf(1_000_000.01), "HKD"));
 
         // when
         mvc.perform(MockMvcRequestBuilders.get("/accounts/{account-id}", accountId)
@@ -140,6 +144,74 @@ class MoneyAccountControllerDbIntegrationTest {
             .andExpectAll(status().isForbidden(),
                 jsonPath("$.error").value("You are not authorized!")
             );
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {0, -0.1, -10000})
+    void shouldNotTransferNegativeAmountToAnotherAccount(double toBeTransferredAmount) throws Exception {
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, accountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "HKD",
+                            "amount": %s
+                        }
+                    """.formatted(accountId2, toBeTransferredAmount))
+            )
+            .andExpectAll(status().isBadRequest(),
+                jsonPath("$.error").value(Matchers.endsWith("must be greater than 0")));
+    }
+
+    @Test
+    void shouldBeAbleToTransferMoneyToAnotherAccount() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, accountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "HKD",
+                            "amount": 10000
+                        }
+                    """.formatted(accountId2))
+            )
+
+            // then
+            .andExpectAll(status().isNoContent());
+
+        mvc.perform(MockMvcRequestBuilders.get("/accounts")
+            .contentType(MediaType.APPLICATION_JSON)
+            .header(HEADER_USER_ID, accountOwnerUserId)
+        ).andExpectAll(status().isOk(),
+            jsonPath("$").isArray(),
+            jsonPath("$", hasSize(2)),
+
+            jsonPath("$[0].id").value(Matchers.startsWith("12345678")),
+            jsonPath("$[0].version").value(2),
+            jsonPath("$[0].currencyCode").value("HKD"),
+            jsonPath("$[0].balanceAmount").value(990_000),
+
+            jsonPath("$[1].id").value(Matchers.startsWith("88888888")),
+            jsonPath("$[1].version").value(2),
+            jsonPath("$[1].currencyCode").value("HKD"),
+            jsonPath("$[1].balanceAmount").value(1_010_000)
+        );
     }
 
 }
