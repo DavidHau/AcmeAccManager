@@ -3,6 +3,7 @@ package com.acmebank.acmeaccountmanager.rest.exception;
 import com.acmebank.acmeaccountmanager.service.exception.InsufficientBalanceErrorException;
 import com.acmebank.acmeaccountmanager.service.exception.NotAuthorizedErrorException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,14 @@ public class GlobalExceptionHandler {
         log.info(exception.getMessage(), exception);
         return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
             HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @ExceptionHandler(OptimisticLockException.class)
+    public ResponseEntity<ErrorResponse> generateOptimisticLockExceptionResponse(
+        OptimisticLockException exception) {
+        log.info(exception.getMessage(), exception);
+        return new ResponseEntity<>(new ErrorResponse("Concurrent operation conflict is detected."),
+            HttpStatus.CONFLICT);
     }
 
 

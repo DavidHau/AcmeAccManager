@@ -5,6 +5,7 @@ import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
 import com.acmebank.acmeaccountmanager.service.exception.InsufficientBalanceErrorException;
 import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
 import org.javamoney.moneta.Money;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,7 +63,6 @@ class AccountManagementImpl implements AccountManagement {
         final MoneyAccountEntity recipientAccount = getMoneyAccountEntityOrThrow(request.recipientAccountId());
         Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
         // TODO: Authorization for operation account
-        // TODO: concurrent edit protection
         // TODO: transaction log
         // TODO: transaction reference number
         deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney);
@@ -70,6 +70,10 @@ class AccountManagementImpl implements AccountManagement {
     }
 
     private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount) {
+        if (!account.getVersion().equals(versionNumber)) {
+            throw new OptimisticLockException(
+                "MoneyAccountId: %s, versionNumber: %s".formatted(account.getId(), versionNumber));
+        }
         Money newBalance = account.getBalance().subtract(amount);
         if (newBalance.isNegative()) {
             throw new InsufficientBalanceErrorException(account.getId());
