@@ -2,6 +2,7 @@ package com.acmebank.acmeaccountmanager.service.impl;
 
 import com.acmebank.acmeaccountmanager.service.api.AccountManagement;
 import com.acmebank.acmeaccountmanager.service.api.MoneyAccount;
+import com.acmebank.acmeaccountmanager.service.exception.InsufficientBalanceErrorException;
 import com.acmebank.acmeaccountmanager.service.impl.mapper.AccountManagementImplMapper;
 import jakarta.persistence.EntityNotFoundException;
 import org.javamoney.moneta.Money;
@@ -61,10 +62,12 @@ class AccountManagementImpl implements AccountManagement {
         Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
         // TODO: Authorization for operation account
         // TODO: concurrent edit protection
-        // TODO: sufficient amount validation
         // TODO: transaction log
         // TODO: transaction reference number
         Money operatingAccountNewBalance = operatingAccount.getBalance().subtract(toBeTransferMoney);
+        if (operatingAccountNewBalance.isNegative()) {
+            throw new InsufficientBalanceErrorException(request.operatingAccountId());
+        }
         Money recipientAccountNewBalance = recipientAccount.getBalance().add(toBeTransferMoney);
         operatingAccount.setBalanceAmount(operatingAccountNewBalance.getNumberStripped());
         recipientAccount.setBalanceAmount(recipientAccountNewBalance.getNumberStripped());
