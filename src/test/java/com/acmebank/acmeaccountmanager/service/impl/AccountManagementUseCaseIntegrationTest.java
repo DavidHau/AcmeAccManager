@@ -102,12 +102,12 @@ class AccountManagementUseCaseIntegrationTest {
 
         // then
         List<TransactionLogEntity> actualTransactionLogs =
-            transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
+            transactionLogRepository.findAllByOperatingAccountUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
         TransactionLogEntity deductLog =
             actualTransactionLogs.stream().filter(log -> log.getOperation().equals("DEDUCT")).findFirst().orElseThrow();
         assertAll(
             () -> assertThat(actualTransactionLogs).hasSizeGreaterThanOrEqualTo(1),
-            () -> assertThat(deductLog.getOperatorUserId()).isEqualTo(accountOwnerUserId),
+            () -> assertThat(deductLog.getOperatingAccountUserId()).isEqualTo(accountOwnerUserId),
             () -> assertThat(deductLog.getOperatingAccountId()).isEqualTo(accountId1),
             () -> assertThat(deductLog.getOperation()).isEqualTo("DEDUCT"),
             () -> assertThat(deductLog.getCounterpartAccountId()).isEqualTo(accountId2),
@@ -140,12 +140,12 @@ class AccountManagementUseCaseIntegrationTest {
 
         // then
         List<TransactionLogEntity> actualTransactionLogs =
-            transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
+            transactionLogRepository.findAllByOperatingAccountUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
         TransactionLogEntity addLog =
             actualTransactionLogs.stream().filter(log -> log.getOperation().equals("ADD")).findFirst().orElseThrow();
         assertAll(
             () -> assertThat(actualTransactionLogs).hasSizeGreaterThanOrEqualTo(1),
-            () -> assertThat(addLog.getOperatorUserId()).isEqualTo(accountOwnerUserId),
+            () -> assertThat(addLog.getOperatingAccountUserId()).isEqualTo(accountOwnerUserId),
             () -> assertThat(addLog.getOperatingAccountId()).isEqualTo(accountId2),
             () -> assertThat(addLog.getOperation()).isEqualTo("ADD"),
             () -> assertThat(addLog.getCounterpartAccountId()).isEqualTo(accountId1),
@@ -177,11 +177,11 @@ class AccountManagementUseCaseIntegrationTest {
 
         // then
         List<TransactionLogEntity> actualTransactionLogs =
-            transactionLogRepository.findAllByOperatorUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
+            transactionLogRepository.findAllByOperatingAccountUserIdOrderByCreateDateTimeUtcDesc(accountOwnerUserId);
         assertAll(
             () -> assertThat(actualTransactionLogs).hasSize(2),
-            () -> assertThat(actualTransactionLogs.get(0).getOperatorUserId())
-                .isEqualTo(actualTransactionLogs.get(1).getOperatorUserId()),
+            () -> assertThat(actualTransactionLogs.get(0).getOperatingAccountUserId())
+                .isEqualTo(actualTransactionLogs.get(1).getOperatingAccountUserId()),
             () -> assertThat(actualTransactionLogs.get(0).getOperatingAccountId())
                 .isEqualTo(actualTransactionLogs.get(1).getCounterpartAccountId()),
             () -> assertThat(actualTransactionLogs.get(0).getOperation()).isEqualTo("ADD"),
@@ -198,4 +198,54 @@ class AccountManagementUseCaseIntegrationTest {
                 .isAfter(actualTransactionLogs.get(1).getCreateDateTimeUtc())
         );
     }
+
+    @Test
+    void shouldStoreTransactionLogForRecipientUserWhenTransferMoneyToAnotherAccountOfDifferentUser() {
+        // given
+        final UUID accountUserId1 = UUID.randomUUID();
+        final UUID accountUserId2 = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountUserId1, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountUserId2, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        accountManagement.transferMoneyToAccount(AccountManagement.TransferMoneyToAccountRequest.builder()
+            .userId(accountUserId1)
+            .operatingAccountId(accountId1)
+            .operatingAccountVersion(1)
+            .recipientAccountId(accountId2)
+            .currencyCode("HKD")
+            .toBeTransferAmount(BigDecimal.valueOf(50.05))
+            .build());
+
+        // then
+        List<TransactionLogEntity> actualSenderLogs =
+            transactionLogRepository.findAllByOperatingAccountUserIdOrderByCreateDateTimeUtcDesc(accountUserId1);
+        List<TransactionLogEntity> actualReceiverLogs =
+            transactionLogRepository.findAllByOperatingAccountUserIdOrderByCreateDateTimeUtcDesc(accountUserId2);
+        assertAll(
+            () -> assertThat(actualSenderLogs).hasSize(1),
+            () -> assertThat(actualReceiverLogs).hasSize(1),
+            () -> assertThat(actualSenderLogs.get(0).getOperatingAccountUserId())
+                .isNotEqualTo(actualReceiverLogs.get(0).getOperatingAccountUserId()),
+            () -> assertThat(actualSenderLogs.get(0).getOperatingAccountUserId()).isEqualTo(accountUserId1),
+            () -> assertThat(actualReceiverLogs.get(0).getOperatingAccountUserId()).isEqualTo(accountUserId2),
+            () -> assertThat(actualSenderLogs.get(0).getOperatingAccountId())
+                .isEqualTo(actualReceiverLogs.get(0).getCounterpartAccountId()),
+            () -> assertThat(actualSenderLogs.get(0).getOperation()).isEqualTo("DEDUCT"),
+            () -> assertThat(actualReceiverLogs.get(0).getOperation()).isEqualTo("ADD"),
+            () -> assertThat(actualSenderLogs.get(0).getCounterpartAccountId())
+                .isEqualTo(actualReceiverLogs.get(0).getOperatingAccountId()),
+            () -> assertThat(actualSenderLogs.get(0).getReferenceCode())
+                .startsWith(actualReceiverLogs.get(0).getReferenceCode()),
+            () -> assertThat(actualSenderLogs.get(0).getCurrencyCode())
+                .isEqualTo(actualReceiverLogs.get(0).getCurrencyCode()),
+            () -> assertThat(actualSenderLogs.get(0).getMoneyAmount())
+                .isEqualTo(actualReceiverLogs.get(0).getMoneyAmount()),
+            () -> assertThat(actualReceiverLogs.get(0).getCreateDateTimeUtc())
+                .isAfter(actualSenderLogs.get(0).getCreateDateTimeUtc())
+        );
+    }
+
 }

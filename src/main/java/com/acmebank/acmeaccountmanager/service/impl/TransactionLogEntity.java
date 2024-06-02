@@ -28,7 +28,7 @@ public class TransactionLogEntity {
     private String operation;
 
     @Column(nullable = false)
-    private UUID operatorUserId;
+    private UUID operatingAccountUserId;
 
     @Column(nullable = false)
     private String referenceCode;
