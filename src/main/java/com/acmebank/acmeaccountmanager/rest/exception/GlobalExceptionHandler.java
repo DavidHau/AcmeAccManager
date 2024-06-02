@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import javax.money.MonetaryException;
+
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
@@ -29,6 +31,14 @@ public class GlobalExceptionHandler {
         log.info(exception.getMessage(), exception);
         return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
             HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MonetaryException.class)
+    public ResponseEntity<ErrorResponse> generateMonetaryExceptionResponse(
+        MonetaryException exception) {
+        log.info(exception.getMessage(), exception);
+        return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
+            HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
 

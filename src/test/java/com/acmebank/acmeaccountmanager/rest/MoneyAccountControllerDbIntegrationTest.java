@@ -214,4 +214,32 @@ class MoneyAccountControllerDbIntegrationTest {
         );
     }
 
+    @Test
+    void shouldReturn422UnprocessableEntityWhenTransferMoneyToAnotherAccountWithMismatchedCurrency() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, accountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "USD",
+                            "amount": 10000
+                        }
+                    """.formatted(accountId2))
+            )
+
+            // then
+            .andExpectAll(status().isUnprocessableEntity(),
+                jsonPath("$.error").value(Matchers.startsWith("Currency mismatch:")));
+    }
+
 }
