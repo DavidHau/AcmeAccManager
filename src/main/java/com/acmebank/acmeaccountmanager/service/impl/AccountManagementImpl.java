@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,14 +24,19 @@ class AccountManagementImpl implements AccountManagement {
     private final MoneyAccountRepository moneyAccountRepository;
     private final AccountManagementImplMapper mapper;
     private final AuthorizationValidationService authorizationValidationService;
+    private final ReferenceCodeGenerator referenceCodeGenerator;
+    private final TransactionLogRepository transactionLogRepository;
 
     public AccountManagementImpl(
         MoneyAccountRepository moneyAccountRepository,
-        AccountManagementImplMapper mapper
+        AccountManagementImplMapper mapper,
+        TransactionLogRepository transactionLogRepository
     ) {
         this.moneyAccountRepository = moneyAccountRepository;
         this.mapper = mapper;
         this.authorizationValidationService = new AuthorizationValidationService();
+        this.referenceCodeGenerator = new ReferenceCodeGenerator();
+        this.transactionLogRepository = transactionLogRepository;
     }
 
     @Override
@@ -62,14 +69,17 @@ class AccountManagementImpl implements AccountManagement {
         final MoneyAccountEntity operatingAccount = getMoneyAccountEntityOrThrow(request.operatingAccountId());
         final Integer operatingAccountVersion = request.operatingAccountVersion();
         final MoneyAccountEntity recipientAccount = getMoneyAccountEntityOrThrow(request.recipientAccountId());
-        Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
-        // TODO: transaction log
-        // TODO: transaction reference number
-        deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney, operatingUserId);
+        final Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
+
+        final String operationType = "TRANSFER";
+        final String transactionCode = "%s_%s".formatted(operationType, referenceCodeGenerator.generate(20));
+        deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney, operatingUserId,
+            transactionCode, recipientAccount.getId());
         addMoney(recipientAccount, toBeTransferMoney);
     }
 
-    private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount, UUID userId) {
+    private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount, UUID userId,
+                             String transactionCode, String counterpartAccountId) {
         authorizationValidationService.ensureHasMoneyDeductionAccess(account, userId);
         if (!account.getVersion().equals(versionNumber)) {
             throw new OptimisticLockException(
@@ -81,11 +91,22 @@ class AccountManagementImpl implements AccountManagement {
         }
         account.setBalanceAmount(newBalance.getNumberStripped());
         moneyAccountRepository.save(account);
+        transactionLogRepository.save(TransactionLogEntity.builder()
+            .operatingAccountId(account.getId())
+            .operation("DEDUCT")
+            .operatorUserId(userId)
+            .referenceCode(transactionCode)
+            .counterpartAccountId(counterpartAccountId)
+            .currencyCode(amount.getCurrency().getCurrencyCode())
+            .moneyAmount(amount.getNumberStripped())
+            .createDateTimeUtc(Instant.now(Clock.systemUTC()))
+            .build());
     }
 
     private void addMoney(MoneyAccountEntity account, Money amount) {
         Money newBalance = account.getBalance().add(amount);
         account.setBalanceAmount(newBalance.getNumberStripped());
         moneyAccountRepository.save(account);
+        // TODO: transaction log
     }
 }
