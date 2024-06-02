@@ -58,20 +58,29 @@ class AccountManagementImpl implements AccountManagement {
     @Override
     public void transferMoneyToAccount(TransferMoneyToAccountRequest request) {
         final MoneyAccountEntity operatingAccount = getMoneyAccountEntityOrThrow(request.operatingAccountId());
+        final Integer operatingAccountVersion = request.operatingAccountVersion();
         final MoneyAccountEntity recipientAccount = getMoneyAccountEntityOrThrow(request.recipientAccountId());
         Money toBeTransferMoney = Money.of(request.toBeTransferAmount(), request.currencyCode());
         // TODO: Authorization for operation account
         // TODO: concurrent edit protection
         // TODO: transaction log
         // TODO: transaction reference number
-        Money operatingAccountNewBalance = operatingAccount.getBalance().subtract(toBeTransferMoney);
-        if (operatingAccountNewBalance.isNegative()) {
-            throw new InsufficientBalanceErrorException(request.operatingAccountId());
+        deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney);
+        addMoney(recipientAccount, toBeTransferMoney);
+    }
+
+    private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount) {
+        Money newBalance = account.getBalance().subtract(amount);
+        if (newBalance.isNegative()) {
+            throw new InsufficientBalanceErrorException(account.getId());
         }
-        Money recipientAccountNewBalance = recipientAccount.getBalance().add(toBeTransferMoney);
-        operatingAccount.setBalanceAmount(operatingAccountNewBalance.getNumberStripped());
-        recipientAccount.setBalanceAmount(recipientAccountNewBalance.getNumberStripped());
-        moneyAccountRepository.save(operatingAccount);
-        moneyAccountRepository.save(recipientAccount);
+        account.setBalanceAmount(newBalance.getNumberStripped());
+        moneyAccountRepository.save(account);
+    }
+
+    private void addMoney(MoneyAccountEntity account, Money amount) {
+        Money newBalance = account.getBalance().add(amount);
+        account.setBalanceAmount(newBalance.getNumberStripped());
+        moneyAccountRepository.save(account);
     }
 }
