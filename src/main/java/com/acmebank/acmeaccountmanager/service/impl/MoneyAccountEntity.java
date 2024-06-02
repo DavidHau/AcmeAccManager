@@ -41,7 +41,6 @@ public class MoneyAccountEntity {
     @PreUpdate
     private void validateBalance() {
         if (balanceAmount.compareTo(BigDecimal.ZERO) < 0) {
-            // TODO: Insufficient balance exception
             throw new IllegalArgumentException("Account balance cannot be negative");
         }
     }

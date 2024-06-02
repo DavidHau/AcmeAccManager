@@ -242,4 +242,31 @@ class MoneyAccountControllerDbIntegrationTest {
                 jsonPath("$.error").value(Matchers.startsWith("Currency mismatch:")));
     }
 
+    @Test
+    void shouldReturn422UnprocessableEntityWhenTransferMoneyToAnotherAccountWithInsufficientBalance() throws Exception {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post("/accounts/{account-id}/transfer", accountId1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HEADER_USER_ID, accountOwnerUserId)
+                .content("""
+                        {
+                            "operatingAccountVersion": 1,
+                            "recipientAccountId": "%s",
+                            "currencyCode": "HKD",
+                            "amount": 1000000.01
+                        }
+                    """.formatted(accountId2))
+            )
+
+            // then
+            .andExpectAll(status().isUnprocessableEntity(),
+                jsonPath("$.error").value("Account[%s] does not have enough balance!".formatted(accountId1)));
+    }
 }

@@ -1,5 +1,6 @@
 package com.acmebank.acmeaccountmanager.rest.exception;
 
+import com.acmebank.acmeaccountmanager.service.exception.InsufficientBalanceErrorException;
 import com.acmebank.acmeaccountmanager.service.exception.NotAuthorizedErrorException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -36,6 +37,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MonetaryException.class)
     public ResponseEntity<ErrorResponse> generateMonetaryExceptionResponse(
         MonetaryException exception) {
+        log.info(exception.getMessage(), exception);
+        return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
+            HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @ExceptionHandler(InsufficientBalanceErrorException.class)
+    public ResponseEntity<ErrorResponse> generateInsufficientBalanceErrorExceptionResponse(
+        InsufficientBalanceErrorException exception) {
         log.info(exception.getMessage(), exception);
         return new ResponseEntity<>(new ErrorResponse(exception.getMessage()),
             HttpStatus.UNPROCESSABLE_ENTITY);
