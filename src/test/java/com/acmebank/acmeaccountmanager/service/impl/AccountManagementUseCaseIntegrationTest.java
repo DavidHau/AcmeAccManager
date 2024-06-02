@@ -82,7 +82,7 @@ class AccountManagementUseCaseIntegrationTest {
     }
 
     @Test
-    void shouldStoreTransactionLogWhenTransferMoneyToAnotherAccount() {
+    void shouldStoreDeductTransactionLogWhenTransferMoneyToAnotherAccount() {
         // given
         final UUID accountOwnerUserId = UUID.randomUUID();
         final String accountId1 = "12345678" + UUID.randomUUID();
@@ -103,17 +103,56 @@ class AccountManagementUseCaseIntegrationTest {
         // then
         List<TransactionLogEntity> actualTransactionLogs =
             transactionLogRepository.findAllByOperatorUserId(accountOwnerUserId);
+        TransactionLogEntity deductLog =
+            actualTransactionLogs.stream().filter(log -> log.getOperation().equals("DEDUCT")).findFirst().orElseThrow();
         assertAll(
-            () -> assertThat(actualTransactionLogs).hasSize(1),
-            () -> assertThat(actualTransactionLogs.get(0).getOperatorUserId()).isEqualTo(accountOwnerUserId),
-            () -> assertThat(actualTransactionLogs.get(0).getOperatingAccountId()).isEqualTo(accountId1),
-            () -> assertThat(actualTransactionLogs.get(0).getOperation()).isEqualTo("DEDUCT"),
-            () -> assertThat(actualTransactionLogs.get(0).getCounterpartAccountId()).isEqualTo(accountId2),
-            () -> assertThat(actualTransactionLogs.get(0).getReferenceCode()).startsWith("TRANSFER_"),
-            () -> assertThat(actualTransactionLogs.get(0).getCurrencyCode()).isEqualTo("HKD"),
-            () -> assertThat(actualTransactionLogs.get(0).getMoneyAmount()).isEqualTo(BigDecimal.valueOf(50.05)),
-            () -> assertThat(actualTransactionLogs.get(0).getCreateDateTimeUtc()).isNotNull()
+            () -> assertThat(actualTransactionLogs).hasSizeGreaterThanOrEqualTo(1),
+            () -> assertThat(deductLog.getOperatorUserId()).isEqualTo(accountOwnerUserId),
+            () -> assertThat(deductLog.getOperatingAccountId()).isEqualTo(accountId1),
+            () -> assertThat(deductLog.getOperation()).isEqualTo("DEDUCT"),
+            () -> assertThat(deductLog.getCounterpartAccountId()).isEqualTo(accountId2),
+            () -> assertThat(deductLog.getReferenceCode()).startsWith("TRANSFER_"),
+            () -> assertThat(deductLog.getReferenceCode()).hasSizeGreaterThan(20),
+            () -> assertThat(deductLog.getCurrencyCode()).isEqualTo("HKD"),
+            () -> assertThat(deductLog.getMoneyAmount()).isEqualTo(BigDecimal.valueOf(50.05)),
+            () -> assertThat(deductLog.getCreateDateTimeUtc()).isNotNull()
         );
     }
 
+    @Test
+    void shouldStoreAddTransactionLogWhenReceiveMoneyFromTransfer() {
+        // given
+        final UUID accountOwnerUserId = UUID.randomUUID();
+        final String accountId1 = "12345678" + UUID.randomUUID();
+        final String accountId2 = "88888888" + UUID.randomUUID();
+        setupAccount(accountOwnerUserId, accountId1, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+        setupAccount(accountOwnerUserId, accountId2, Money.of(BigDecimal.valueOf(1_000_000), "HKD"));
+
+        // when
+        accountManagement.transferMoneyToAccount(AccountManagement.TransferMoneyToAccountRequest.builder()
+            .userId(accountOwnerUserId)
+            .operatingAccountId(accountId1)
+            .operatingAccountVersion(1)
+            .recipientAccountId(accountId2)
+            .currencyCode("HKD")
+            .toBeTransferAmount(BigDecimal.valueOf(50.05))
+            .build());
+
+        // then
+        List<TransactionLogEntity> actualTransactionLogs =
+            transactionLogRepository.findAllByOperatorUserId(accountOwnerUserId);
+        TransactionLogEntity addLog =
+            actualTransactionLogs.stream().filter(log -> log.getOperation().equals("ADD")).findFirst().orElseThrow();
+        assertAll(
+            () -> assertThat(actualTransactionLogs).hasSizeGreaterThanOrEqualTo(1),
+            () -> assertThat(addLog.getOperatorUserId()).isEqualTo(accountOwnerUserId),
+            () -> assertThat(addLog.getOperatingAccountId()).isEqualTo(accountId2),
+            () -> assertThat(addLog.getOperation()).isEqualTo("ADD"),
+            () -> assertThat(addLog.getCounterpartAccountId()).isEqualTo(accountId1),
+            () -> assertThat(addLog.getReferenceCode()).startsWith("TRANSFER_"),
+            () -> assertThat(addLog.getCurrencyCode()).isEqualTo("HKD"),
+            () -> assertThat(addLog.getMoneyAmount()).isEqualTo(BigDecimal.valueOf(50.05)),
+            () -> assertThat(addLog.getCreateDateTimeUtc()).isNotNull()
+        );
+    }
 }

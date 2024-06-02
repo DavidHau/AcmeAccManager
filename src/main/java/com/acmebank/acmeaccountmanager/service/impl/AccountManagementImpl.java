@@ -75,7 +75,8 @@ class AccountManagementImpl implements AccountManagement {
         final String transactionCode = "%s_%s".formatted(operationType, referenceCodeGenerator.generate(20));
         deductMoney(operatingAccount, operatingAccountVersion, toBeTransferMoney, operatingUserId,
             transactionCode, recipientAccount.getId());
-        addMoney(recipientAccount, toBeTransferMoney);
+        addMoney(recipientAccount, toBeTransferMoney, operatingUserId,
+            transactionCode, operatingAccount.getId());
     }
 
     private void deductMoney(MoneyAccountEntity account, int versionNumber, Money amount, UUID userId,
@@ -103,10 +104,20 @@ class AccountManagementImpl implements AccountManagement {
             .build());
     }
 
-    private void addMoney(MoneyAccountEntity account, Money amount) {
+    private void addMoney(MoneyAccountEntity account, Money amount, UUID userId,
+                          String transactionCode, String counterpartAccountId) {
         Money newBalance = account.getBalance().add(amount);
         account.setBalanceAmount(newBalance.getNumberStripped());
         moneyAccountRepository.save(account);
-        // TODO: transaction log
+        transactionLogRepository.save(TransactionLogEntity.builder()
+            .operatingAccountId(account.getId())
+            .operation("ADD")
+            .operatorUserId(userId)
+            .referenceCode(transactionCode)
+            .counterpartAccountId(counterpartAccountId)
+            .currencyCode(amount.getCurrency().getCurrencyCode())
+            .moneyAmount(amount.getNumberStripped())
+            .createDateTimeUtc(Instant.now(Clock.systemUTC()))
+            .build());
     }
 }
