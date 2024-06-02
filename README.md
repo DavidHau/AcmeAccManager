@@ -1,3 +1,7 @@
+## Project Build
+
+Execute command in terminal: `./mvnw clean package -Dmaven.test.skip=true`
+
 ## Local Rest API Testing
 
 Swagger UI is enabled.
